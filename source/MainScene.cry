@@ -1,0 +1,231 @@
+import Graphics2D;
+import Graphics2DText;
+import Math;
+import Random;
+import TwoCansAlpha2;
+
+const X_RES = 640;
+const Y_RES = 240;
+
+const FONT_SIZE = 16;
+
+const BORDER = 3;
+
+const SLIDER_WIDTH = 256;
+const SLIDER_HEIGHT = 40;
+const SLIDER_Y_PAD = 10;
+const BOX_SIZE = (3 * SLIDER_HEIGHT + 2 * SLIDER_Y_PAD);
+const TOP = (Y_RES - BOX_SIZE) / 2;
+const UI_WIDTH = SLIDER_WIDTH + 2 * BOX_SIZE;
+const LEFT_BOX_LEFT = (X_RES - UI_WIDTH) / 4;
+const RIGHT_BOX_LEFT = (X_RES - UI_WIDTH) / 2 + BOX_SIZE;
+const SLIDER_LEFT = 3 * (X_RES - UI_WIDTH) / 4 + 2 * BOX_SIZE;
+
+const TIMER_HEIGHT = 12;
+const TIMER_PAD = BORDER;
+
+const REQUIRED_DISTANCE = 25;
+const TIMER_MAX_INIT = 1000;
+const TIMER_MAX_MIN = 100;
+const SPEEDUP = 15;
+const MINIMUM_NEW_COLOR_DISTANCE = 128;
+
+function drawBar(x, y, width, height, pct, r, g, b) {
+	Graphics2D.Draw.rectangle
+		( x - BORDER
+		, y - BORDER
+		, width + 2 * BORDER
+		, height + 2 * BORDER
+		, 0, 0, 0);
+	Graphics2D.Draw.rectangle(x, y, width * pct, height, r, g, b);
+}
+
+class MainScene : AbstractScene {
+	field r = 128;
+	field g = 128;
+	field b = 128;
+
+	field rSlider;
+	field gSlider;
+	field bSlider;
+
+	field diff;
+	field distance;
+
+	field score = 0;
+	field timerMax = TIMER_MAX_INIT;
+	field timer;
+
+	field mouseDown = false;
+
+	field font = FontResource.fromSystem('Arial').getRenderer().setColor(0, 0, 0).setSize(FONT_SIZE);
+
+	function reset() {
+		// Randomize color.
+		oldR = this.r;
+		oldG = this.g;
+		oldB = this.b;
+		do {
+			this.r = Random.randomInt(0, 256);
+			this.g = Random.randomInt(0, 256);
+			this.b = Random.randomInt(0, 256);
+			dSquared = (this.r - oldR) ** 2 + (this.g - oldG) ** 2 + (this.b - oldB) ** 2;
+		} while (dSquared < MINIMUM_NEW_COLOR_DISTANCE ** 2);
+
+		// Set sliders to gray and deselect them.
+		this.rSlider.value = 128;
+		this.gSlider.value = 128;
+		this.bSlider.value = 128;
+		this.rSlider.selected = false;
+		this.gSlider.selected = false;
+		this.bSlider.selected = false;
+
+		// Reset timer to max.
+		this.timer = this.timerMax;
+	}
+
+	constructor() : base() {
+		// Create sliders.
+
+		this.rSlider = new Slider
+			( 128, 255
+			, SLIDER_LEFT, TOP
+			, SLIDER_WIDTH, SLIDER_HEIGHT
+			, [255, 0, 0]
+			);
+		this.rSlider.lessHotkey = KeyboardKey.Q;
+		this.rSlider.moreHotkey = KeyboardKey.O;
+
+		this.gSlider = new Slider
+			( 128, 255
+			, SLIDER_LEFT, TOP + SLIDER_HEIGHT + SLIDER_Y_PAD
+			, SLIDER_WIDTH, SLIDER_HEIGHT
+			, [0, 255, 0]
+			);
+		this.gSlider.lessHotkey = KeyboardKey.A;
+		this.gSlider.moreHotkey = KeyboardKey.K;
+
+		this.bSlider = new Slider
+			( 128, 255
+			, SLIDER_LEFT, TOP + 2 * (SLIDER_HEIGHT + SLIDER_Y_PAD)
+			, SLIDER_WIDTH, SLIDER_HEIGHT
+			, [0, 0, 255]
+			);
+		this.bSlider.lessHotkey = KeyboardKey.Z;
+		this.bSlider.moreHotkey = KeyboardKey.M;
+
+		this.reset();
+	}
+
+	function update(inputManager, events) {
+		if (this.timer > 0) {
+			--this.timer;
+
+			// Update sliders.
+			this.rSlider.update(inputManager, events);
+			this.gSlider.update(inputManager, events);
+			this.bSlider.update(inputManager, events);
+
+			// Compute difference and Euclidean distance from the current guess to the true color.
+			this.diff = [this.rSlider.value - this.r, this.gSlider.value - this.g, this.bSlider.value - this.b];
+			this.distance = (this.diff[0] ** 2 + this.diff[1] ** 2 + this.diff[2] ** 2) ** 0.5;
+			if (this.distance < REQUIRED_DISTANCE) {
+				// Success.
+				++this.score;
+				this.timerMax -= SPEEDUP;
+				if (this.timerMax < TIMER_MAX_MIN) {
+					this.timerMax = TIMER_MAX_MIN;
+				}
+				this.reset();
+			}
+		} else {
+			// Game over.
+			if (inputManager.isKeyPressedThisFrame(KeyboardKey.R)) {
+				this.score = 0;
+				this.timerMax = TIMER_MAX_INIT;
+				this.reset();
+			}
+		}
+	}
+
+	function render() {
+		Graphics2D.Draw.fill(255, 255, 255);
+
+		// Draw timer.
+		drawBar
+			( TIMER_PAD, TIMER_PAD
+			, X_RES - 2 * TIMER_PAD, TIMER_HEIGHT
+			, 1.0 * this.timer / this.timerMax
+			, 255, 255, 255
+			);
+
+		// Draw sliders.
+		this.rSlider.draw();
+		this.gSlider.draw();
+		this.bSlider.draw();
+
+		// Draw left box.
+		drawBar
+			( LEFT_BOX_LEFT, TOP
+			, BOX_SIZE, BOX_SIZE
+			, 1.0
+			, this.r, this.g, this.b
+			);
+
+		// Draw right box.
+		drawBar
+			( RIGHT_BOX_LEFT, TOP
+			, BOX_SIZE, BOX_SIZE
+			, 1.0
+			, this.rSlider.value, this.gSlider.value, this.bSlider.value
+			);
+
+		// Draw score.
+		scoreImage = this.font.render(this.score);
+		scoreImage.draw(0, Y_RES - scoreImage.height);
+
+		if (this.timer == 0) {
+			// Game over.
+
+			// Draw distance to solution.
+			distanceImage = this.font.render
+				( '<' + this.diff[0] + ", " + this.diff[1] + ", " + this.diff[2] + "> ("
+				+ Math.floor(this.distance) + ')'
+				);
+			distanceImage.draw((X_RES - distanceImage.width) / 2, Y_RES - distanceImage.height);
+
+			// Draw solution on sliders.
+			xR = this.rSlider.x + this.rSlider.width * this.r / this.rSlider.maxValue;
+			Graphics2D.Draw.line
+				( xR
+				, this.rSlider.y
+				, xR
+				, this.rSlider.y + this.rSlider.height
+				, 1
+				, 255, 255, 255
+				);
+			xG = this.gSlider.x + this.gSlider.width * this.g / this.gSlider.maxValue;
+			Graphics2D.Draw.line
+				( xG
+				, this.gSlider.y
+				, xG
+				, this.gSlider.y + this.gSlider.height
+				, 1
+				, 255, 255, 255
+				);
+			xB = this.bSlider.x + this.bSlider.width * this.b / this.bSlider.maxValue;
+			Graphics2D.Draw.line
+				( xB
+				, this.bSlider.y
+				, xB
+				, this.bSlider.y + this.bSlider.height
+				, 1
+				, 255, 255, 255
+				);
+
+			// Draw restart message.
+			restartImage = this.font.render("Press R.");
+			restartImage.draw(X_RES - restartImage.width, Y_RES - restartImage.height);
+		}
+	}
+}
