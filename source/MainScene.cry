@@ -25,9 +25,9 @@ const TIMER_HEIGHT = 12;
 const TIMER_PAD = BORDER;
 
 const REQUIRED_DISTANCE = 25;
-const TIMER_MAX_INIT = 1000;
-const TIMER_MAX_MIN = 100;
-const SPEEDUP = 15;
+const TIMER_MAX_INIT = 2000;
+const TIMER_MAX_MIN = 200;
+const SPEEDUP = 30;
 const MINIMUM_NEW_COLOR_DISTANCE = 128;
 
 function drawBar(x, y, width, height, pct, r, g, b) {
@@ -41,6 +41,15 @@ function drawBar(x, y, width, height, pct, r, g, b) {
 }
 
 class MainScene : AbstractScene {
+	static field font = FontResource
+		.fromResource("Lato-Bold.ttf")
+		.getRenderer()
+		.setColor(0, 0, 0)
+		.setSize(FONT_SIZE);
+
+	static field restartImage = MainScene.font.render("Press R to restart. ");
+	static field instructionsImage = MainScene.font.render("Drag the sliders to match the box colors. ");
+
 	field r = 128;
 	field g = 128;
 	field b = 128;
@@ -58,7 +67,8 @@ class MainScene : AbstractScene {
 
 	field mouseDown = false;
 
-	field font = FontResource.fromSystem('Arial').getRenderer().setColor(0, 0, 0).setSize(FONT_SIZE);
+	field scoreImage;
+	field distanceImage;
 
 	function reset() {
 		// Randomize color.
@@ -84,7 +94,7 @@ class MainScene : AbstractScene {
 		this.timer = this.timerMax;
 	}
 
-	constructor() : base() {
+	constructor() {
 		// Create sliders.
 
 		this.rSlider = new Slider
@@ -95,6 +105,8 @@ class MainScene : AbstractScene {
 			);
 		this.rSlider.lessHotkey = KeyboardKey.Q;
 		this.rSlider.moreHotkey = KeyboardKey.O;
+		this.rSlider.lessHotkeyLabel = MainScene.font.setColor(255, 255, 255).render(" Q");
+		this.rSlider.moreHotkeyLabel = MainScene.font.setColor(255, 255, 255).render("O ");
 
 		this.gSlider = new Slider
 			( 128, 255
@@ -104,6 +116,8 @@ class MainScene : AbstractScene {
 			);
 		this.gSlider.lessHotkey = KeyboardKey.A;
 		this.gSlider.moreHotkey = KeyboardKey.K;
+		this.gSlider.lessHotkeyLabel = MainScene.font.setColor(255, 255, 255).render(" A");
+		this.gSlider.moreHotkeyLabel = MainScene.font.setColor(255, 255, 255).render("L ");
 
 		this.bSlider = new Slider
 			( 128, 255
@@ -113,6 +127,10 @@ class MainScene : AbstractScene {
 			);
 		this.bSlider.lessHotkey = KeyboardKey.Z;
 		this.bSlider.moreHotkey = KeyboardKey.M;
+		this.bSlider.lessHotkeyLabel = MainScene.font.setColor(255, 255, 255).render(" Z");
+		this.bSlider.moreHotkeyLabel = MainScene.font.setColor(255, 255, 255).render("M ");
+
+		this.scoreImage = MainScene.font.setColor(0, 0, 0).render(" Score: 0");
 
 		this.reset();
 	}
@@ -120,6 +138,14 @@ class MainScene : AbstractScene {
 	function update(inputManager, events) {
 		if (this.timer > 0) {
 			--this.timer;
+			if (this.timer == 0) {
+				// Game over.
+				this.distanceImage = MainScene.font.setColor(255, 255, 255).render
+					( '<' + this.diff[0] + ", " + this.diff[1] + ", " + this.diff[2] + "> ("
+					+ Math.floor(this.distance) + ')'
+					);
+				return;
+			}
 
 			// Update sliders.
 			this.rSlider.update(inputManager, events);
@@ -132,6 +158,7 @@ class MainScene : AbstractScene {
 			if (this.distance < REQUIRED_DISTANCE) {
 				// Success.
 				++this.score;
+				this.scoreImage = MainScene.font.setColor(0, 0, 0).render(" Score: " + this.score);
 				this.timerMax -= SPEEDUP;
 				if (this.timerMax < TIMER_MAX_MIN) {
 					this.timerMax = TIMER_MAX_MIN;
@@ -141,9 +168,7 @@ class MainScene : AbstractScene {
 		} else {
 			// Game over.
 			if (inputManager.isKeyPressedThisFrame(KeyboardKey.R)) {
-				this.score = 0;
-				this.timerMax = TIMER_MAX_INIT;
-				this.reset();
+				this.switchScene(new MainScene());
 			}
 		}
 	}
@@ -181,18 +206,19 @@ class MainScene : AbstractScene {
 			);
 
 		// Draw score.
-		scoreImage = this.font.render(this.score);
-		scoreImage.draw(0, Y_RES - scoreImage.height);
+		this.scoreImage.draw(0, Y_RES - this.scoreImage.height);
 
-		if (this.timer == 0) {
+		if (this.timer > 0) {
+			// Draw instructions.
+			MainScene.instructionsImage.draw
+				( X_RES - MainScene.instructionsImage.width
+				, Y_RES - MainScene.instructionsImage.height
+				);
+		} else {
 			// Game over.
 
 			// Draw distance to solution.
-			distanceImage = this.font.render
-				( '<' + this.diff[0] + ", " + this.diff[1] + ", " + this.diff[2] + "> ("
-				+ Math.floor(this.distance) + ')'
-				);
-			distanceImage.draw((X_RES - distanceImage.width) / 2, Y_RES - distanceImage.height);
+			this.distanceImage.draw((X_RES - this.distanceImage.width) / 2, Y_RES - this.distanceImage.height);
 
 			// Draw solution on sliders.
 			xR = this.rSlider.x + this.rSlider.width * this.r / this.rSlider.maxValue;
@@ -224,8 +250,7 @@ class MainScene : AbstractScene {
 				);
 
 			// Draw restart message.
-			restartImage = this.font.render("Press R.");
-			restartImage.draw(X_RES - restartImage.width, Y_RES - restartImage.height);
+			MainScene.restartImage.draw(X_RES - MainScene.restartImage.width, Y_RES - MainScene.restartImage.height);
 		}
 	}
 }

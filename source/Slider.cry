@@ -2,7 +2,7 @@ import Graphics2D;
 import TwoCansAlpha4;
 
 const SLIDER_BORDER = 3;
-const SLIDER_DELTA = 0.025;
+const SLIDER_DELTA = 0.0125;
 
 class Slider : UI {
 	field value;
@@ -14,6 +14,9 @@ class Slider : UI {
 	field maxHotkey = null;
 	field lessHotkey = null;
 	field moreHotkey = null;
+
+	field lessHotkeyLabel = null;
+	field moreHotkeyLabel = null;
 
 	constructor(value, maxValue, x, y, width, height, color)
 		: base(x, y, width, height)
@@ -88,5 +91,18 @@ class Slider : UI {
 			, this.width * this.value / this.maxValue, this.height
 			, this.color[0], this.color[1], this.color[2]
 			);
+		// Draw hotkey labels.
+		if (this.lessHotkeyLabel != null) {
+			this.lessHotkeyLabel.draw
+				( this.x
+				, this.y + 0.5 * (this.height - this.lessHotkeyLabel.height)
+				);
+		}
+		if (this.moreHotkeyLabel != null) {
+			this.moreHotkeyLabel.draw
+				( this.x + this.width - this.moreHotkeyLabel.width
+				, this.y + 0.5 * (this.height - this.moreHotkeyLabel.height)
+				);
+		}
 	}
 }
